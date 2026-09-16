@@ -8,13 +8,11 @@ import dev.booky.generation.util.GenerationUtil;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.Property;
 import org.apache.commons.lang3.math.NumberUtils;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 public final class BlockMappingsGenerator implements IGenerator {
 
@@ -28,15 +26,15 @@ public final class BlockMappingsGenerator implements IGenerator {
             JsonArray entries = new JsonArray();
             for (BlockState state : states) {
                 JsonObject object = new JsonObject();
-                for (Map.Entry<Property<?>, Comparable<?>> entry : state.getValues().entrySet()) {
-                    String valueStr = ((Property) entry.getKey()).getName(entry.getValue());
+                state.getValues().forEach(v -> {
+                    String valueStr = v.valueName();
                     JsonPrimitive value = NumberUtils.isDigits(valueStr)
                             ? new JsonPrimitive(Integer.parseInt(valueStr))
                             : "true".equals(valueStr) ? new JsonPrimitive(true)
                             : "false".equals(valueStr) ? new JsonPrimitive(false)
                             : new JsonPrimitive(valueStr);
-                    object.add(entry.getKey().getName(), value);
-                }
+                    object.add(v.property().getName(), value);
+                });
                 entries.add(object);
             }
 

@@ -12,13 +12,8 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.DamageTypeTags;
-import net.minecraft.world.flag.FeatureFlags;
-import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.HoeItem;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ShovelItem;
-import net.minecraft.world.level.block.entity.FuelValues;
 import org.slf4j.Logger;
 
 import java.io.BufferedWriter;
@@ -41,9 +36,6 @@ import static net.minecraft.core.component.DataComponents.MAX_DAMAGE;
 public final class ItemTypesGenerator implements IGenerator {
 
     private static final Logger LOGGER = LogUtils.getLogger();
-
-    private static final FuelValues VANILLA_FUEL_VALUES = FuelValues.vanillaBurnTimes(
-            GenerationUtil.getVanillaRegistries(), FeatureFlags.REGISTRY.allFlags());
 
     @Override
     public void generate(Path outDir, String genName) throws IOException {
@@ -137,19 +129,21 @@ public final class ItemTypesGenerator implements IGenerator {
         MUSIC_DISC(item -> item.components().has(JUKEBOX_PLAYABLE)),
         EDIBLE(item -> item.components().has(FOOD)),
         FIRE_RESISTANT(item -> Optionull.mapOrDefault(item.components().get(DataComponents.DAMAGE_RESISTANT),
-                resistant -> resistant.types().equals(DamageTypeTags.IS_FIRE), false)),
+                resistant -> resistant.types().unwrapKey()
+                        .map(k -> k.equals(DamageTypeTags.IS_FIRE))
+                        .orElse(false), false)),
         WOOD_TIER("wood"),
         STONE_TIER("stone"),
         IRON_TIER("iron"),
         DIAMOND_TIER("diamond"),
         GOLD_TIER("gold"),
         NETHERITE_TIER("netherite"),
-        FUEL(item -> VANILLA_FUEL_VALUES.fuelItems().contains(item)),
+        FUEL(item -> item.components().has(DataComponents.COOKING_FUEL)),
         SWORD("sword"),
-        SHOVEL(item -> item instanceof ShovelItem),
-        AXE(item -> item instanceof AxeItem),
+        SHOVEL("shovel"),
+        AXE("axe"),
         PICKAXE("pickaxe"),
-        HOE(item -> item instanceof HoeItem);
+        HOE("hoe");
 
         private final Predicate<Item> predicate;
 

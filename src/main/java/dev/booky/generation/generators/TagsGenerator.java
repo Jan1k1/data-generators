@@ -8,14 +8,14 @@ import com.google.gson.JsonObject;
 import dev.booky.generation.util.GenerationUtil;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.DataGenerator;
-import net.minecraft.data.registries.VanillaRegistries;
 import net.minecraft.data.tags.VanillaBlockTagsProvider;
 import net.minecraft.data.tags.VanillaItemTagsProvider;
 import net.minecraft.resources.Identifier;
+import net.minecraft.tags.BlockItemTagId;
+import net.minecraft.tags.BlockItemTags;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.tags.TagKey;
-import net.minecraft.util.Util;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -32,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -42,8 +43,7 @@ public final class TagsGenerator implements IGenerator {
 
         DataGenerator.PackGenerator vanilla = generator.getVanillaPack(true);
 
-        CompletableFuture<HolderLookup.Provider> vanillaRegistryFuture = CompletableFuture.supplyAsync(
-                VanillaRegistries::createLookup, Util.backgroundExecutor());
+        CompletableFuture<HolderLookup.Provider> vanillaRegistryFuture = CompletableFuture.completedFuture(GenerationUtil.getVanillaRegistries());
         vanilla.addProvider(output ->
                 new VanillaBlockTagsProvider(output, vanillaRegistryFuture));
         vanilla.addProvider(output ->
@@ -78,6 +78,48 @@ public final class TagsGenerator implements IGenerator {
         return className + '.' + GenerationUtil.asFieldName(tagName);
     }
 
+    // the order of the mc class fields is required for the tags
+    // to have consistent ordering
+    private static List<TagKey<?>> getTagKeys(Class<?> tagsClass) {
+        List<TagKey<?>> tagKeys = new ArrayList<>();
+        for (Field field : tagsClass.getFields()) {
+            if (!Modifier.isPublic(field.getModifiers())
+                    || !Modifier.isStatic(field.getModifiers())
+                    || !Modifier.isFinal(field.getModifiers())) {
+                continue;
+            }
+
+            try {
+                if (field.get(null) instanceof TagKey<?> tagKey) {
+                    tagKeys.add(tagKey);
+                }
+            } catch (IllegalAccessException exception) {
+                throw new RuntimeException(exception);
+            }
+        }
+        return tagKeys;
+    }
+
+    private static List<TagKey<?>> getTagKeys(Function<BlockItemTagId, TagKey<?>> tagSide) {
+        List<TagKey<?>> tagKeys = new ArrayList<>();
+        for (Field field : BlockItemTags.class.getFields()) {
+            if (!Modifier.isPublic(field.getModifiers())
+                    || !Modifier.isStatic(field.getModifiers())
+                    || !Modifier.isFinal(field.getModifiers())) {
+                continue;
+            }
+
+            try {
+                if (field.get(null) instanceof BlockItemTagId tagId) {
+                    tagKeys.add(tagSide.apply(tagId));
+                }
+            } catch (IllegalAccessException exception) {
+                throw new RuntimeException(exception);
+            }
+        }
+        return tagKeys;
+    }
+
     @Override
     public void generate(Path outDir, String genName) throws IOException {
         Path genOutDir = outDir.resolve(genName);
@@ -91,9 +133,13 @@ public final class TagsGenerator implements IGenerator {
         List<Path> tagDirs = searchDirs(vanillaDataDir, "tags");
 
         // build info data for available tag types - PacketEvents only supports blocks/items at the moment
+        // shared block / item tags aren't always referenced by the block / item
+        // tags classes, but are only defined by the BlockItemTags class
         List<TagType> tagTypes = List.of(
-                new TagType(Identifier.withDefaultNamespace("block"), "BlockTags", "StateTypes", BlockTags.class),
-                new TagType(Identifier.withDefaultNamespace("item"), "ItemTags", "ItemTypes", ItemTags.class)
+                TagType.of(Identifier.withDefaultNamespace("block"), "BlockTags", "StateTypes",
+                        getTagKeys(BlockTags.class), getTagKeys(BlockItemTagId::block)),
+                TagType.of(Identifier.withDefaultNamespace("item"), "ItemTags", "ItemTypes",
+                        getTagKeys(ItemTags.class), getTagKeys(BlockItemTagId::item))
         );
 
         // the content of this map is used for copying the tag content from
@@ -102,24 +148,10 @@ public final class TagsGenerator implements IGenerator {
         Map<TagContent, String> copyRefs = new HashMap<>();
 
         for (TagType tagType : tagTypes) {
-            // look at order of mc fields, this is required for the tags
-            // to have consistent ordering
-            //
             // the paths of the specific tag are populated later
             Map<Identifier, List<Path>> tagPaths = new LinkedHashMap<>();
-            for (Field field : tagType.mcClass().getFields()) {
-                if (!Modifier.isPublic(field.getModifiers())
-                        || !Modifier.isStatic(field.getModifiers())
-                        || !Modifier.isFinal(field.getModifiers())) {
-                    continue;
-                }
-
-                try {
-                    TagKey<?> key = (TagKey<?>) field.get(null);
-                    tagPaths.put(key.location(), new ArrayList<>());
-                } catch (IllegalAccessException exception) {
-                    throw new RuntimeException(exception);
-                }
+            for (TagKey<?> tagKey : tagType.tagKeys()) {
+                tagPaths.put(tagKey.location(), new ArrayList<>());
             }
 
             // populate tag paths with data generated content
@@ -206,8 +238,19 @@ public final class TagsGenerator implements IGenerator {
             Identifier registryName,
             String tagsClass,
             String typesClass,
-            Class<?> mcClass
+            List<TagKey<?>> tagKeys
     ) {
+
+        private static TagType of(Identifier registryName, String tagsClass, String typesClass,
+                                  List<TagKey<?>> vanillaTagKeys, List<TagKey<?>> sharedTagKeys) {
+            Map<Identifier, TagKey<?>> tagKeys = new LinkedHashMap<>();
+            for (List<TagKey<?>> tagKeyList : List.of(vanillaTagKeys, sharedTagKeys)) {
+                for (TagKey<?> tagKey : tagKeyList) {
+                    tagKeys.putIfAbsent(tagKey.location(), tagKey);
+                }
+            }
+            return new TagType(registryName, tagsClass, typesClass, List.copyOf(tagKeys.values()));
+        }
     }
 
     private record TagContent(List<Identifier> tags, List<Identifier> types) {

@@ -25,7 +25,7 @@ public final class GenerationUtil {
             .disableHtmlEscaping()
             .setPrettyPrinting()
             .create();
-    public static HolderLookup.Provider VANILLA_REGISTRIES = VanillaRegistries.createLookup();
+    public static HolderLookup.Provider VANILLA_REGISTRIES = VanillaRegistries.createWorldLookup();
     public static RegistryAccess VANILLA_REGISTRY_ACCESS = null;
 
     private GenerationUtil() {

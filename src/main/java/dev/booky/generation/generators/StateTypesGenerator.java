@@ -25,7 +25,6 @@ public class StateTypesGenerator implements IGenerator {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    @SuppressWarnings("deprecation") // solid state is deprecated
     @Override
     public void generate(Path outDir, String genName) throws IOException {
         Path genDir = outDir.resolve(genName);
@@ -79,9 +78,9 @@ public class StateTypesGenerator implements IGenerator {
                 BlockState defState = block.defaultBlockState();
                 writer.write(".blastResistance(" + block.getExplosionResistance() + "f)");
                 writer.write(".hardness(" + block.defaultDestroyTime() + "f)");
-                writer.write(".isBlocking(" + block.isSolid() + ")");
+                writer.write(".isBlocking(FIXME)");
                 writer.write(".requiresCorrectTool(" + block.properties().requiresCorrectToolForDrops + ")");
-                writer.write(".isSolid(" + defState.properties().hasCollision + ")");
+                writer.write(".isSolid(" + block.properties().hasCollision + ")");
                 writer.write(".setMaterial(FIXME)");
 
                 if (defState.hasLargeCollisionShape()) {
