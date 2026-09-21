@@ -9,6 +9,7 @@ import dev.booky.generation.generators.ItemTypesGenerator;
 import dev.booky.generation.generators.RegistryGenerator;
 import dev.booky.generation.generators.StateTypesGenerator;
 import dev.booky.generation.generators.TagsGenerator;
+import dev.booky.generation.util.GenerationUtil;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import org.apache.logging.log4j.LogManager;
@@ -50,6 +51,9 @@ public final class GenerationMain {
         Bootstrap.bootStrap();
         LOGGER.info("Took {}ms to initialize minecraft constants",
                 System.currentTimeMillis() - start);
+
+        LOGGER.info("Binding delayed components with VanillaRegistries...");
+        GenerationUtil.initializeAfterBootstrap();
 
         LOGGER.info("Initializing generators...");
         List<IGenerator> generators = List.of(
