@@ -76,7 +76,7 @@ public final class GenerationUtil {
     }
 
     private static <T> Registry<T> materialize(HolderLookup.RegistryLookup<T> lookup) {
-        MappedRegistry<T> registry = new MappedRegistry<>(lookup.key(), lookup.registryLifecycle());
+        MappedRegistry<T> registry = new MappedRegistry<>((ResourceKey<? extends Registry<T>>) (ResourceKey<?>) lookup.key(), lookup.registryLifecycle());
         lookup.listElements().forEach(holder ->
                 registry.register(holder.key(), holder.value(), RegistrationInfo.BUILT_IN));
         return registry.freeze();
